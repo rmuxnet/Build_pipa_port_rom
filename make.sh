@@ -273,12 +273,14 @@ sudo cp "$OFOX_OUTPUT_BOOT" "$GITHUB_WORKSPACE/images/boot.img"
 
 # Add Via browser to product/app
 if [ -d "$GITHUB_WORKSPACE/${device}_files/Via" ]; then
-  sudo cp -r "$GITHUB_WORKSPACE/${device}_files/Via" "$GITHUB_WORKSPACE/images/product/app/"
+  sudo mkdir -p "$GITHUB_WORKSPACE/images/product/app/Via"
+  sudo cp -r "$GITHUB_WORKSPACE/${device}_files/Via" "$GITHUB_WORKSPACE/images/product/app/Via"
 fi
 
 # Add Gboard (LatinImeGoogle) to product/data-app
 if [ -d "$GITHUB_WORKSPACE/${device}_files/LatinImeGoogle" ]; then
-  sudo cp -r "$GITHUB_WORKSPACE/${device}_files/LatinImeGoogle" "$GITHUB_WORKSPACE/images/product/data-app/"
+  sudo mkdir -p "$GITHUB_WORKSPACE/images/product/data-app/LatinImeGoogle"
+  sudo cp -r "$GITHUB_WORKSPACE/${device}_files/LatinImeGoogle" "$GITHUB_WORKSPACE/images/product/data-app/LatinImeGoogle"
 fi
 
 # Replace 'sheng' with 'pipa' in product/etc/build.prop
