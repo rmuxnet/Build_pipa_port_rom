@@ -11,11 +11,12 @@ on:
         required: true
         default: 'https://bn.d.miui.com/OS2.0.13.0.UMZCNXM/pipa-ota_full-OS2.0.13.0.UMZCNXM-user-14.0-a905ad5ecc.zip'
 
+permissions:
+  contents: write
+
 jobs:
-    name: Build ROM by ${{ github.actor }}
+  build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
