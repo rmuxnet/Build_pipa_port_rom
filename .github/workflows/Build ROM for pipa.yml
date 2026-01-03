@@ -12,8 +12,10 @@ on:
         default: 'https://bn.d.miui.com/OS2.0.13.0.UMZCNXM/pipa-ota_full-OS2.0.13.0.UMZCNXM-user-14.0-a905ad5ecc.zip'
 
 jobs:
-  build:
+    name: Build ROM by ${{ github.actor }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Maximize build space
         uses: easimon/maximize-build-space@master
@@ -25,7 +27,7 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
       - name: Checkout repository
-        uses: actions/checkout@main
+        uses: actions/checkout@v5
       - name: Build ROM
         run: |
           sudo bash "$GITHUB_WORKSPACE"/make.sh ${{ github.event.inputs.URL }} ${{ github.event.inputs.VENDOR_URL }} $GITHUB_ENV $GITHUB_WORKSPACE
@@ -38,14 +40,15 @@ jobs:
           touch file.log
           echo -e "Base version: ${{ env.vendor_os_version }}\nBase security patch: ${{ env.vendor_security_patch }}\nBase baseline: ${{ env.vendor_base_line}}\n\nPort version: ${{ env.port_os_version }}\nPort security patch: ${{ env.port_security_patch }}\nPort baseline: ${{ env.port_base_line }}" > file.log
       - name: Upload to Github Release
-        uses: ncipollo/release-action@main
+        uses: softprops/action-gh-release@master
         with:
-          artifacts: ${{ github.workspace }}/GithubRelease/*
-          name: ${{ env.port_os_version }}
-          tag: ${{ env.port_os_version }}
-          bodyFile: "${{ github.workspace }}/file.log"
-          allowUpdates: true
-          artifactErrorsFailBuild: true
+          files: |
+            GithubRelease/*
+          name: HyperOS for Pipa ${{ env.port_os_version }}
+          tag_name: ${{ env.port_os_version }}
+          body_path: file.log
+          draft: false
+          prerelease: false
       - name: Upload to Oracle S3
         if: github.repository == 'YuKongA/Build_houji_port_rom'
         run: |
