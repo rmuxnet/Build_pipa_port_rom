@@ -35,11 +35,16 @@ jobs:
       - name: Process ROM
         run: |
           mkdir -p "$GITHUB_WORKSPACE"/GithubRelease
-          cd "$GITHUB_WORKSPACE"/GithubRelease
-          sudo split -b 1536M -d "$GITHUB_WORKSPACE"/zip/${{ env.rom_name }} ${{ env.rom_name }}
-          cd "$GITHUB_WORKSPACE"
+          cp "$GITHUB_WORKSPACE"/zip/${{ env.rom_name }} "$GITHUB_WORKSPACE"/GithubRelease/
           touch file.log
           echo -e "Base version: ${{ env.vendor_os_version }}\nBase security patch: ${{ env.vendor_security_patch }}\nBase baseline: ${{ env.vendor_base_line}}\n\nPort version: ${{ env.port_os_version }}\nPort security patch: ${{ env.port_security_patch }}\nPort baseline: ${{ env.port_base_line }}" > file.log
+
+      - name: Upload ROM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hyperos2.2_PIPA_ROM
+          path: GithubRelease/${{ env.rom_name }}
+          retention-days: 7
       - name: Upload to Github Release
         uses: softprops/action-gh-release@master
         with:
