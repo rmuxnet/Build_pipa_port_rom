@@ -150,6 +150,18 @@ echo -e "${Blue}- Base baseline: $vendor_base_line"
 echo "vendor_base_line=$vendor_base_line" >>$GITHUB_ENV
 
 # Main patching and customization section
+# Update ro.mi.os.version.incremental in mi_ext/etc/build.prop
+update_mi_ext_incremental() {
+  local build_prop="$GITHUB_WORKSPACE/images/mi_ext/etc/build.prop"
+  if [ -f "$build_prop" ]; then
+    local version=$(grep '^ro.mi.os.version.incremental=' "$build_prop" | cut -d= -f2-)
+    if [ -n "$version" ]; then
+      sudo sed -i "s|^ro.mi.os.version.incremental=.*$|ro.mi.os.version.incremental=${version} | rmux|" "$build_prop"
+    fi
+  fi
+}
+
+# Call the function after all patching but before building super.img
 echo -e "${Red}- Starting patching and customization"
 Start_Time
 # Replace product overlays
@@ -169,7 +181,7 @@ sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/displayconfig.zip -d "$GI
 
 # Unify build.prop
 echo -e "${Red}- Unify build.prop"
-sudo sed -i 's/ro.build.user=[^*]*/ro.build.user=YuKongA/' "$GITHUB_WORKSPACE"/images/system/system/build.prop
+sudo sed -i 's/ro.build.user=[^*]*/ro.build.user=rmux/' "$GITHUB_WORKSPACE"/images/system/system/build.prop
 for port_build_prop in $(sudo find "$GITHUB_WORKSPACE"/images/ -type f -name "build.prop"); do
   sudo sed -i 's/build.date=[^*]*/build.date='"${build_time}"'/' "${port_build_prop}"
   sudo sed -i 's/build.date.utc=[^*]*/build.date.utc='"${build_utc}"'/' "${port_build_prop}"
@@ -186,14 +198,6 @@ done
 
 # Remove unwanted apps
 echo -e "${Red}- Remove unwanted apps"
-apps=("MIGalleryLockscreen" "MIUIDriveMode" "MIUIDuokanReader" "MIUIGameCenter" "MIUINewHome" "MIUIYoupin" "MIUIHuanJi" "MIUIMiDrive" "MIUIVirtualSim" "ThirdAppAssistant" "XMRemoteController" "MIUIVipAccount" "MiuiScanner" "Xinre" "SmartHome" "MiShop" "MiRadio" "MIUICompass" "MediaEditor" "BaiduIME" "iflytek.inputmethod" "MIService" "MIUIEmail" "MIUIVideo" "MIUIMusicT")
-for app in "${apps[@]}"; do
-  appsui=$(sudo find "$GITHUB_WORKSPACE"/images/product/data-app/ -type d -iname "*${app}*")
-  if [[ -n $appsui ]]; then
-    echo -e "${Yellow}- Found and removing: $appsui"
-    sudo rm -rf "$appsui"
-  fi
-done
 
 # Change resolution
 echo -e "${Red}- Change resolution"
@@ -203,6 +207,11 @@ sudo sed -i 's/persist.miui.density_v2=[^*]*/persist.miui.density_v2=440/' "$GIT
 echo -e "${Red}- Replace camera"
 sudo rm -rf "$GITHUB_WORKSPACE"/images/product/priv-app/MiuiCamera/*
 sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.zip -d "$GITHUB_WORKSPACE"/images/product/priv-app/MiuiCamera/
+
+# Replace apex in system_ext
+echo -e "${Red}- Replace apex in system_ext"
+sudo rm -rf "$GITHUB_WORKSPACE"/images/system_ext/apex/*
+sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/apex.zip -d "$GITHUB_WORKSPACE"/images/system_ext/apex/
 
 # --- OrangeFox Recovery patching ---
 echo -e "${Red}- Patching OrangeFox Recovery"
@@ -258,6 +267,32 @@ cd "$GITHUB_WORKSPACE"
 rm -rf "$GITHUB_WORKSPACE/work_rec"
 
 echo -e "${Green}==>${NC} ${BOLD}OrangeFox patched boot saved to: $OFOX_OUTPUT_BOOT${NC}"
+
+# Copy patched boot image as boot.img into images
+sudo cp "$OFOX_OUTPUT_BOOT" "$GITHUB_WORKSPACE/images/boot.img"
+
+# Add Via browser to product/app
+if [ -d "$GITHUB_WORKSPACE/${device}_files/Via" ]; then
+  sudo cp -r "$GITHUB_WORKSPACE/${device}_files/Via" "$GITHUB_WORKSPACE/images/product/app/"
+fi
+
+# Add Gboard (LatinImeGoogle) to product/data-app
+if [ -d "$GITHUB_WORKSPACE/${device}_files/LatinImeGoogle" ]; then
+  sudo cp -r "$GITHUB_WORKSPACE/${device}_files/LatinImeGoogle" "$GITHUB_WORKSPACE/images/product/data-app/"
+fi
+
+# Replace 'sheng' with 'pipa' in product/etc/build.prop
+if [ -f "$GITHUB_WORKSPACE/images/product/etc/build.prop" ]; then
+  sudo sed -i 's/sheng/pipa/g' "$GITHUB_WORKSPACE/images/product/etc/build.prop"
+fi
+
+# Copy pangu folder into product/pangu
+if [ -d "$GITHUB_WORKSPACE/${device}_files/pangu" ]; then
+  sudo cp -r "$GITHUB_WORKSPACE/${device}_files/pangu" "$GITHUB_WORKSPACE/images/product/pangu"
+fi
+
+# Update mi_ext build.prop incremental version
+update_mi_ext_incremental
 
 # Copy changed files and cleanup
 echo -e "${Red}- Copy changed files and cleanup"
