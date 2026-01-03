@@ -1,21 +1,21 @@
-﻿name: Build ROM for Houji
+﻿name: Build ROM for Pipa
 on:
   workflow_dispatch:
     inputs:
       URL:
-        description: "移植包下载地址"
+        description: "Port package download URL"
         required: true
-        default: 'https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.9.0.UNACNXM/miui_AURORA_OS1.0.9.0.UNACNXM_53b6a43c0e_14.0.zip'
+        default: 'https://bn.d.miui.com/OS2.0.211.0.VNXCNXM/sheng-ota_full-OS2.0.211.0.VNXCNXM-user-15.0-b89bcc4fbf.zip'
       VENDOR_URL:
-        description: "底包下载地址"
+        description: "Base package download URL"
         required: true
-        default: 'https://bkt-sgp-miui-ota-update-alisgp.oss-ap-southeast-1.aliyuncs.com/OS1.0.36.0.UNCCNXM/miui_HOUJI_OS1.0.36.0.UNCCNXM_54ab2de231_14.0.zip'
+        default: 'https://bn.d.miui.com/OS2.0.13.0.UMZCNXM/pipa-ota_full-OS2.0.13.0.UMZCNXM-user-14.0-a905ad5ecc.zip'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: 最大化构建环境
+      - name: Maximize build space
         uses: easimon/maximize-build-space@master
         with:
           swap-size-mb: 8192
@@ -24,20 +24,20 @@ jobs:
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
-      - name: 检出仓库文件
+      - name: Checkout repository
         uses: actions/checkout@main
-      - name: 构建 ROM
+      - name: Build ROM
         run: |
           sudo bash "$GITHUB_WORKSPACE"/make.sh ${{ github.event.inputs.URL }} ${{ github.event.inputs.VENDOR_URL }} $GITHUB_ENV $GITHUB_WORKSPACE
-      - name: 处理 ROM
+      - name: Process ROM
         run: |
           mkdir -p "$GITHUB_WORKSPACE"/GithubRelease
           cd "$GITHUB_WORKSPACE"/GithubRelease
           sudo split -b 1536M -d "$GITHUB_WORKSPACE"/zip/${{ env.rom_name }} ${{ env.rom_name }}
           cd "$GITHUB_WORKSPACE"
           touch file.log
-          echo -e "底包版本: ${{ env.vendor_os_version }}\n底包安全补丁版本: ${{ env.vendor_security_patch }}\n底包基线版本: ${{ env.vendor_base_line}}\n\n移植包版本: ${{ env.port_os_version }}\n移植包安全补丁版本: ${{ env.port_security_patch }}\n移植包基线版本: ${{ env.port_base_line }}" > file.log
-      - name: 上传到 Github Release
+          echo -e "Base version: ${{ env.vendor_os_version }}\nBase security patch: ${{ env.vendor_security_patch }}\nBase baseline: ${{ env.vendor_base_line}}\n\nPort version: ${{ env.port_os_version }}\nPort security patch: ${{ env.port_security_patch }}\nPort baseline: ${{ env.port_base_line }}" > file.log
+      - name: Upload to Github Release
         uses: ncipollo/release-action@main
         with:
           artifacts: ${{ github.workspace }}/GithubRelease/*
@@ -46,13 +46,13 @@ jobs:
           bodyFile: "${{ github.workspace }}/file.log"
           allowUpdates: true
           artifactErrorsFailBuild: true
-      - name: 上传到 Oracle S3
+      - name: Upload to Oracle S3
         if: github.repository == 'YuKongA/Build_houji_port_rom'
         run: |
           sudo -v ; curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone/
           echo ${{ secrets.confbase64 }} > base64.txt
           base64 --decode base64.txt > ~/.config/rclone/rclone.conf
-          rclone delete kr:/public-bucket/houji
-          rclone mkdir kr:/public-bucket/houji
-          rclone copy -P "$GITHUB_WORKSPACE"/zip/${{ env.rom_name }} kr:/public-bucket/houji
+          rclone delete kr:/public-bucket/pipa
+          rclone mkdir kr:/public-bucket/pipa
+          rclone copy -P "$GITHUB_WORKSPACE"/zip/${{ env.rom_name }} kr:/public-bucket/pipa
