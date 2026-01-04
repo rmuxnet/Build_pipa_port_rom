@@ -45,16 +45,6 @@ jobs:
           name: hyperos2.2_PIPA_ROM
           path: GithubRelease/${{ env.rom_name }}
           retention-days: 7
-      - name: Upload to Github Release
-        uses: softprops/action-gh-release@master
-        with:
-          files: |
-            GithubRelease/*
-          name: HyperOS for Pipa ${{ env.port_os_version }}
-          tag_name: ${{ env.port_os_version }}
-          body_path: file.log
-          draft: false
-          prerelease: false
       - name: Upload to Oracle S3
         if: github.repository == 'YuKongA/Build_houji_port_rom'
         run: |
