@@ -196,7 +196,8 @@ fi
 
 echo -e "${Red}- Replace camera"
 sudo rm -rf "$GITHUB_WORKSPACE"/images/product/priv-app/MiuiCamera/*
-sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.zip -d "$GITHUB_WORKSPACE/images/product/priv-app/MiuiCamera/
+# FIX: Added missing closing quote below
+sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.zip -d "$GITHUB_WORKSPACE/images/product/priv-app/MiuiCamera/"
 
 echo -e "${Red}- Overwriting apex in system_ext"
 if [ -f "$GITHUB_WORKSPACE/${device}_files/apex.zip" ]; then
