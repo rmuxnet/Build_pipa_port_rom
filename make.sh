@@ -10,6 +10,9 @@ VENDOR_URL="$2"       # Base package download URL
 GITHUB_ENV="$3"       # Output environment variable file
 GITHUB_WORKSPACE="$4" # Working directory
 
+# Environment variable check for Optional Features
+INCLUDE_OFOX="${INCLUDE_OFOX:-false}" # Default to false if not set
+
 device=pipa # Device codename
 
 Red='\033[1;31m'
@@ -39,37 +42,12 @@ erofs_mkfs="$GITHUB_WORKSPACE"/tools/mkfs.erofs
 lpmake="$GITHUB_WORKSPACE"/tools/lpmake
 apktool_jar="java -jar "$GITHUB_WORKSPACE"/tools/apktool.jar"
 
-Start_Time() {
-  Start_s=$(date +%s)
-  Start_ns=$(date +%N)
-}
-
-End_Time() {
-  local End_s End_ns time_s time_ns
-  End_s=$(date +%s)
-  End_ns=$(date +%N)
-  time_s=$((10#$End_s - 10#$Start_s))
-  time_ns=$((10#$End_ns - 10#$Start_ns))
-  if ((time_ns < 0)); then ((time_s--)); ((time_ns += 1000000000)); fi
-  local ns=$((time_ns % 1000000))
-  local ms=$((time_ns / 1000000))
-  local sec=$((time_s % 60))
-  local min=$((time_s / 60 % 60))
-  local hour=$((time_s / 3600))
-  if ((hour > 0)); then echo -e "${Green}- $1 took: ${Blue}$hour h $min m $sec s $ms ms";
-  elif ((min > 0)); then echo -e "${Green}- $1 took: ${Blue}$min m $sec s $ms ms";
-  elif ((sec > 0)); then echo -e "${Green}- $1 took: ${Blue}$sec s $ms ms";
-  else echo -e "${Green}- $1 took: ${Blue}$ms ms"; fi
-}
-
 # --- Download ---
 echo -e "${Red}- Downloading ROM packages"
-Start_Time
 echo -e "${Yellow}- Downloading port package"
 aria2c -x16 -j$(nproc) -U "Mozilla/5.0" -d "$GITHUB_WORKSPACE" "$URL"
 echo -e "${Yellow}- Downloading base package"
 aria2c -x16 -j$(nproc) -U "Mozilla/5.0" -d "$GITHUB_WORKSPACE" "$VENDOR_URL"
-End_Time "Downloads"
 
 # --- Unpack ---
 echo -e "${Red}- Extracting ROM packages"
@@ -104,7 +82,6 @@ sudo $erofs_extract -s -i "$GITHUB_WORKSPACE"/Extra_dir/mi_ext.img -x
 rm -rf "$GITHUB_WORKSPACE"/Extra_dir/mi_ext.img
 
 # 2. SEPARATE Super images from Firmware images
-# Images that go into SUPER: odm, vendor, dsp
 echo -e "${Yellow}- Preparing Super Partition files..."
 sudo mv "$GITHUB_WORKSPACE"/Extra_dir/odm.img "$GITHUB_WORKSPACE"/images/
 sudo mv "$GITHUB_WORKSPACE"/Extra_dir/vendor.img "$GITHUB_WORKSPACE"/images/
@@ -115,12 +92,10 @@ else
     echo -e "${Red}!! WARNING: Stock dsp.img not found."
 fi
 
-# 3. Everything else is FIRMWARE (boot, dtbo, modem, etc.)
+# 3. Everything else is FIRMWARE
 echo -e "${Yellow}- Preparing Firmware-Update folder..."
 sudo mkdir -p "$GITHUB_WORKSPACE"/"${device}"/firmware-update/
-# Copy all remaining files in Extra_dir to firmware-update
 sudo cp -rf "$GITHUB_WORKSPACE"/Extra_dir/* "$GITHUB_WORKSPACE"/"${device}"/firmware-update/
-# Clean up Extra_dir
 rm -rf "$GITHUB_WORKSPACE"/Extra_dir
 
 # --- Extracting Port Payload ---
@@ -144,8 +119,6 @@ echo "vendor_os_version=$vendor_os_version" >>$GITHUB_ENV
 system_build_prop=$(find "$GITHUB_WORKSPACE"/images/system/system/ -maxdepth 1 -type f -name "build.prop" | head -n 1)
 port_security_patch=$(grep "ro.build.version.security_patch=" "$system_build_prop" | awk -F "=" '{print $2}')
 echo "port_security_patch=$port_security_patch" >>$GITHUB_ENV
-# Skipping vendor prop read as vendor is packed
-
 port_base_line=$(grep "ro.system.build.id=" "$system_build_prop" | awk -F "=" '{print $2}')
 echo "port_base_line=$port_base_line" >>$GITHUB_ENV
 
@@ -161,7 +134,6 @@ update_mi_ext_incremental() {
 
 # --- Patching & Customization ---
 echo -e "${Red}- Starting patching and customization"
-Start_Time
 
 update_mi_ext_incremental
 
@@ -196,7 +168,6 @@ fi
 
 echo -e "${Red}- Replace camera"
 sudo rm -rf "$GITHUB_WORKSPACE"/images/product/priv-app/MiuiCamera/*
-# FIX: Added missing closing quote below
 sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.zip -d "$GITHUB_WORKSPACE/images/product/priv-app/MiuiCamera/"
 
 echo -e "${Red}- Overwriting apex in system_ext"
@@ -228,49 +199,19 @@ if [ -d "$GITHUB_WORKSPACE/${device}_files/pangu" ]; then
   sudo cp -r "$GITHUB_WORKSPACE/${device}_files/pangu" "$GITHUB_WORKSPACE/images/product/pangu"
 fi
 
-# --- OrangeFox Patching ---
-echo -e "${Red}- Patching OrangeFox Recovery"
-OFOX_JSON_URL="https://raw.githubusercontent.com/PipaDB/Releases/refs/heads/main/ofox.json"
-OFOX_ZIP="$GITHUB_WORKSPACE/tools/ofox.zip"
-OFOX_OUTPUT_DIR="$GITHUB_WORKSPACE/output_patched"
-OFOX_INPUT_BOOT="$GITHUB_WORKSPACE/${device}/firmware-update/boot.img"
-OFOX_OUTPUT_BOOT="$OFOX_OUTPUT_DIR/ofox-boot-pipa.img"
-
-mkdir -p "$OFOX_OUTPUT_DIR" "$GITHUB_WORKSPACE/tools"
-
-if [[ ! -f "$OFOX_ZIP" ]]; then
-    echo -e "${Blue}:: Fetching OrangeFox..."
-    JSON_DATA=$(curl -sL "$OFOX_JSON_URL")
-    OFOX_URL=$(echo "$JSON_DATA" | grep -oP '(?<="url": ")[^"]*')
-    wget -q --show-progress -O "$OFOX_ZIP" "$OFOX_URL"
-fi
-
-if [ -f "$OFOX_INPUT_BOOT" ]; then
-    rm -rf "$GITHUB_WORKSPACE/work_rec" && mkdir -p "$GITHUB_WORKSPACE/work_rec"
-    cp "$OFOX_INPUT_BOOT" "$GITHUB_WORKSPACE/work_rec/boot.img"
-    cd "$GITHUB_WORKSPACE/work_rec" || exit 1
-    $magiskboot unpack -h boot.img >/dev/null 2>&1
-    unzip -pq "$OFOX_ZIP" recovery.img > recovery.img
-    $magiskboot unpack -h recovery.img >/dev/null 2>&1
-    mv ramdisk.cpio ramdisk-ofox.cpio
-    rm -f kernel dtb recovery.img header
-    mv ramdisk-ofox.cpio ramdisk.cpio
-    if [ -f "header" ]; then
-        CMDLINE=$(grep '^cmdline=' header | cut -d= -f2-)
-        CLEAN_CMDLINE=$(echo "$CMDLINE" | sed -e 's/skip_override//' -e 's/  */ /g' -e 's/[ \t]*$//')
-        sed -i "s|cmdline=$CMDLINE|cmdline=$CLEAN_CMDLINE|" header
+# --- OrangeFox Patching (Optional) ---
+# Checked via environment variable INCLUDE_OFOX
+if [ "$INCLUDE_OFOX" == "true" ]; then
+    echo -e "${Red}- Running OrangeFox Patching Script..."
+    if [ -f "$GITHUB_WORKSPACE/tools/ofox_patch.sh" ]; then
+        chmod +x "$GITHUB_WORKSPACE/tools/ofox_patch.sh"
+        # Source to share variables like $device and $GITHUB_WORKSPACE
+        source "$GITHUB_WORKSPACE/tools/ofox_patch.sh"
+    else
+        echo -e "${Red}!! ERROR: tools/ofox_patch.sh not found!"
     fi
-    $magiskboot repack boot.img >/dev/null 2>&1
-    mv new-boot.img "$OFOX_OUTPUT_BOOT"
-    cd "$GITHUB_WORKSPACE"
-    rm -rf "$GITHUB_WORKSPACE/work_rec"
-    echo -e "${Green}==> OrangeFox patched boot saved."
-    # Overwrite the stock boot.img in firmware-update so it gets flashed
-    sudo cp "$OFOX_OUTPUT_BOOT" "$GITHUB_WORKSPACE/${device}/firmware-update/boot.img"
-    # Also copy to images just in case
-    sudo cp "$OFOX_OUTPUT_BOOT" "$GITHUB_WORKSPACE/images/boot.img"
 else
-    echo -e "${Red}!! Stock boot.img not found, skipping OrangeFox patch."
+    echo -e "${Yellow}- OrangeFox Patching skipped (INCLUDE_OFOX is false)."
 fi
 
 # Cleanup customized files
@@ -278,11 +219,9 @@ echo -e "${Red}- Cleanup"
 sudo cp -r "$GITHUB_WORKSPACE"/"${device}"/* "$GITHUB_WORKSPACE"/images
 sudo rm -rf "$GITHUB_WORKSPACE"/"${device}"
 sudo rm -rf "$GITHUB_WORKSPACE"/"${device}"_files
-End_Time "Patching and customization"
 
 # --- Building Super ---
 echo -e "${Red}- Building super.img"
-Start_Time
 
 # 1. Rebuild ONLY the modified partitions
 partitions=("mi_ext" "product" "system" "system_ext")
@@ -309,7 +248,6 @@ else
 fi
 
 # 3. Pack Super
-# Matches the user's "Pack Super" tool configuration
 $lpmake --metadata-size 65536 --super-name super --block-size 4096 \
   --partition dsp_a:readonly:"$dsp_size":qti_dynamic_partitions_a --image dsp_a="$GITHUB_WORKSPACE"/images/dsp.img \
   --partition dsp_b:readonly:0:qti_dynamic_partitions_b \
@@ -329,15 +267,12 @@ $lpmake --metadata-size 65536 --super-name super --block-size 4096 \
   --group qti_dynamic_partitions_a:9126805504 --group qti_dynamic_partitions_b:9126805504 --virtual-ab -F \
   --output "$GITHUB_WORKSPACE"/images/super.img
 
-End_Time "Build super"
-
-# Cleanup Images (Don't delete boot.img, we need it for zip)
+# Cleanup Images
 for i in dsp mi_ext odm product system system_ext vendor; do
   rm -rf "$GITHUB_WORKSPACE"/images/$i.img
 done
 
-# --- Add Flash Tools (From Zip) ---
-# Logic taken from reference script
+# --- Add Flash Tools ---
 echo -e "${Red}- Adding Flash Tools"
 if [ -f "$GITHUB_WORKSPACE/tools/flashtools.zip" ]; then
     sudo unzip -o -q "$GITHUB_WORKSPACE"/tools/flashtools.zip -d "$GITHUB_WORKSPACE"/images
@@ -348,17 +283,12 @@ fi
 
 # --- Compress & Output ---
 echo -e "${Red}- Creating flashable zip"
-Start_Time
 sudo find "$GITHUB_WORKSPACE"/images/ -exec touch -t 200901010000.00 {} \;
 zstd -12 -f "$GITHUB_WORKSPACE"/images/super.img -o "$GITHUB_WORKSPACE"/images/super.zst --rm
-End_Time "Compress super.zst"
 
 echo -e "${Red}- Packaging zip"
-Start_Time
-# This packages everything: super.zst, boot.img, firmware-update, and flash tools
 sudo $a7z a "$GITHUB_WORKSPACE"/zip/hyperos_${device}_${port_os_version}.zip "$GITHUB_WORKSPACE"/images/* >/dev/null
 sudo rm -rf "$GITHUB_WORKSPACE"/images
-End_Time "Zip creation"
 
 md5=$(md5sum "$GITHUB_WORKSPACE"/zip/hyperos_${device}_${port_os_version}.zip)
 echo "MD5=${md5:0:32}" >>$GITHUB_ENV
