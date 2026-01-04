@@ -47,13 +47,13 @@ jobs:
           echo -e "Base version: ${{ env.vendor_os_version }}\nBase security patch: ${{ env.vendor_security_patch }}\nBase baseline: ${{ env.vendor_base_line}}\n\nPort version: ${{ env.port_os_version }}\nPort security patch: ${{ env.port_security_patch }}\nPort baseline: ${{ env.port_base_line }}" > file.log
 
       - name: Upload ROM artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: hyperos2.2_PIPA_ROM
           path: GithubRelease/${{ env.rom_name }}
           retention-days: 7
       - name: Upload to Oracle S3
-        if: github.repository == 'YuKongA/Build_houji_port_rom'
+        if: github.repository == 'PipaDB/Build_pipa_port_rom'
         run: |
           sudo -v ; curl https://rclone.org/install.sh | sudo bash
           mkdir -p ~/.config/rclone/
