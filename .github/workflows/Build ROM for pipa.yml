@@ -1,4 +1,4 @@
-﻿name: Build ROM for Pipa
+name: Build ROM for Pipa
 on:
   workflow_dispatch:
     inputs:
@@ -10,6 +10,11 @@ on:
         description: "Base package download URL"
         required: true
         default: 'https://bn.d.miui.com/OS2.0.13.0.UMZCNXM/pipa-ota_full-OS2.0.13.0.UMZCNXM-user-14.0-a905ad5ecc.zip'
+      INCLUDE_OFOX:
+        description: "Patch Boot with OrangeFox?"
+        required: true
+        default: 'true'
+        type: boolean
 
 permissions:
   contents: write
@@ -28,10 +33,12 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v4
       - name: Build ROM
+        env:
+          INCLUDE_OFOX: ${{ inputs.INCLUDE_OFOX }}
         run: |
-          sudo bash "$GITHUB_WORKSPACE"/make.sh ${{ github.event.inputs.URL }} ${{ github.event.inputs.VENDOR_URL }} $GITHUB_ENV $GITHUB_WORKSPACE
+          sudo -E bash "$GITHUB_WORKSPACE"/make.sh ${{ inputs.URL }} ${{ inputs.VENDOR_URL }} $GITHUB_ENV $GITHUB_WORKSPACE
       - name: Process ROM
         run: |
           mkdir -p "$GITHUB_WORKSPACE"/GithubRelease
