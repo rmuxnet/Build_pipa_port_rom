@@ -201,7 +201,7 @@ sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/MiuiCamera.zip -d "$GITHU
 
 echo -e "${Red}- Overwriting apex in system_ext"
 if [ -f "$GITHUB_WORKSPACE/${device}_files/apex.zip" ]; then
-    sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/apex.zip -d "$GITHUB_WORKSPACE/images/system_ext/apex/
+    sudo unzip -o -q "$GITHUB_WORKSPACE"/"${device}"_files/apex.zip -d "$GITHUB_WORKSPACE/images/system_ext/apex/"
     echo -e "${Green}:: Apex files overwritten."
 else
     echo -e "${Yellow}:: No apex.zip found."
