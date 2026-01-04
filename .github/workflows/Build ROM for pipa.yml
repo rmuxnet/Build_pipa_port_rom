@@ -32,13 +32,17 @@ jobs:
           remove-dotnet: 'true'
           remove-android: 'true'
           remove-haskell: 'true'
+      
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
+      
       - name: Build ROM
         env:
           INCLUDE_OFOX: ${{ inputs.INCLUDE_OFOX }}
         run: |
+          # sudo -E ensures the INCLUDE_OFOX variable is passed to the script
           sudo -E bash "$GITHUB_WORKSPACE"/make.sh ${{ inputs.URL }} ${{ inputs.VENDOR_URL }} $GITHUB_ENV $GITHUB_WORKSPACE
+      
       - name: Process ROM
         run: |
           mkdir -p "$GITHUB_WORKSPACE"/GithubRelease
@@ -47,18 +51,8 @@ jobs:
           echo -e "Base version: ${{ env.vendor_os_version }}\nBase security patch: ${{ env.vendor_security_patch }}\nBase baseline: ${{ env.vendor_base_line}}\n\nPort version: ${{ env.port_os_version }}\nPort security patch: ${{ env.port_security_patch }}\nPort baseline: ${{ env.port_base_line }}" > file.log
 
       - name: Upload ROM artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v4
         with:
           name: hyperos2.2_PIPA_ROM
           path: GithubRelease/${{ env.rom_name }}
-          retention-days: 7
-      - name: Upload to Oracle S3
-        if: github.repository == 'PipaDB/Build_pipa_port_rom'
-        run: |
-          sudo -v ; curl https://rclone.org/install.sh | sudo bash
-          mkdir -p ~/.config/rclone/
-          echo ${{ secrets.confbase64 }} > base64.txt
-          base64 --decode base64.txt > ~/.config/rclone/rclone.conf
-          rclone delete kr:/public-bucket/pipa
-          rclone mkdir kr:/public-bucket/pipa
-          rclone copy -P "$GITHUB_WORKSPACE"/zip/${{ env.rom_name }} kr:/public-bucket/pipa
+          retention-days: 90
