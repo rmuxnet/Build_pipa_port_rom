@@ -309,7 +309,6 @@ fi
 
 # 3. Pack Super
 # Matches the user's "Pack Super" tool configuration
-# dsp, mi_ext, odm, product, system, system_ext, vendor
 $lpmake --metadata-size 65536 --super-name super --block-size 4096 \
   --partition dsp_a:readonly:"$dsp_size":qti_dynamic_partitions_a --image dsp_a="$GITHUB_WORKSPACE"/images/dsp.img \
   --partition dsp_b:readonly:0:qti_dynamic_partitions_b \
@@ -336,6 +335,16 @@ for i in dsp mi_ext odm product system system_ext vendor; do
   rm -rf "$GITHUB_WORKSPACE"/images/$i.img
 done
 
+# --- Add Flash Tools (From Zip) ---
+# Logic taken from reference script
+echo -e "${Red}- Adding Flash Tools"
+if [ -f "$GITHUB_WORKSPACE/tools/flashtools.zip" ]; then
+    sudo unzip -o -q "$GITHUB_WORKSPACE"/tools/flashtools.zip -d "$GITHUB_WORKSPACE"/images
+    echo -e "${Green}:: Flash tools added."
+else
+    echo -e "${Red}!! WARNING: flashtools.zip not found in tools/ folder."
+fi
+
 # --- Compress & Output ---
 echo -e "${Red}- Creating flashable zip"
 Start_Time
@@ -345,7 +354,7 @@ End_Time "Compress super.zst"
 
 echo -e "${Red}- Packaging zip"
 Start_Time
-# This packages everything: super.zst, boot.img, and the firmware-update folder
+# This packages everything: super.zst, boot.img, firmware-update, and flash tools
 sudo $a7z a "$GITHUB_WORKSPACE"/zip/hyperos_${device}_${port_os_version}.zip "$GITHUB_WORKSPACE"/images/* >/dev/null
 sudo rm -rf "$GITHUB_WORKSPACE"/images
 End_Time "Zip creation"
